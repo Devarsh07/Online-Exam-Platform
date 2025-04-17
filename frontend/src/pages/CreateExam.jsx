@@ -39,7 +39,7 @@ const createExam = () => {
   const handleSubmit = async () => {
     try {
          // Retrieve token
-         const user = JSON.parse(localStorage.getItem("user")); // parse the JSON string
+        const user = JSON.parse(localStorage.getItem("user")); // parse the JSON string
         const token = user?.token; // safe check
         const response = await axios.post("http://localhost:5000/api/exams/", exam, {
           headers: { Authorization: `Bearer ${token}` },

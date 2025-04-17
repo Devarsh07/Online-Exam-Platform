@@ -308,32 +308,156 @@ router.post("/start/:examId", auth, async (req, res) => {
 //     }
 //   });
   
+// router.post('/api/exams/submit/:examSessionId', async (req, res) => {
+//     const examSessionId = req.params.examSessionId; // ✅ this is the fix
+//     const answers = req.body;
+  
+//     if (!examSessionId) {
+//       return res.status(400).json({ error: "Missing examSessionId" });
+//     }
+  
+//     // rest of your logic
+//   });
+  
 
-router.post("/submit/:examSessionId", auth, async (req, res) => {
-    if (req.user.role !== "student") {
-      return res.status(403).json({ msg: "Access denied" });
+
+
+
+
+
+// router.post("/submit/:examSessionId", auth, async (req, res) => {
+//     if (req.user.role !== "student") {
+//       return res.status(403).json({ msg: "Access denied" });
+//     }
+  
+//     try {
+//       const examSession = await ExamSession.findById(req.params.examSessionId);
+//       if (!examSession) return res.status(404).json({ msg: "Exam session not found" });
+  
+//       const exam = await Exam.findById(examSession.examId);
+//       if (!exam) return res.status(404).json({ msg: "Exam not found" });
+  
+//       const currentTime = new Date();
+//       if (currentTime > examSession.endTime) {
+//         return res.status(400).json({ msg: "Time expired. Auto-submitting exam." });
+//       }
+  
+//       const { answers } = req.body;
+//       if (!answers) return res.status(400).json({ msg: "Invalid answers format" });
+  
+//       const calculateScore = (questions, studentAnswers) => {
+//         let score = 0;
+//         questions.forEach(question => {
+//           const questionId = question._id.toString();
+//           if (studentAnswers[questionId] && studentAnswers[questionId] === question.correctAnswer) {
+//             score++;
+//           }
+//         });
+//         return score;
+//       };
+  
+//       const score = calculateScore(exam.questions, answers);
+//       const percentage = (score / exam.questions.length) * 100;
+  
+//       const result = new Result({
+//         userId: req.user.userId,
+//         examId: exam._id,
+//         score,
+//         totalQuestions: exam.questions.length,
+//         percentage,
+//       });
+  
+//       await result.save();
+  
+//       examSession.submitted = true;
+//       examSession.submissionTime = currentTime;
+//       await examSession.save();
+  
+//       let certificateUrl = null;
+  
+//       // 🎓 Only generate certificate if above 50%
+//       if (percentage > 50) {
+//         const userId = new mongoose.Types.ObjectId(req.user.userId);
+//         const user = await User.findById(userId);
+//         const studentName = user.name || "Student";
+//         const examName = exam.title || "Your Exam";
+  
+//         // Sanitize and build file name and path
+//         const safeStudentName = studentName.replace(/[\/\\?%*:|"<>]/g, '').replace(/\s+/g, '-');
+//         const safeExamName = examName.replace(/[\/\\?%*:|"<>]/g, '').replace(/\s+/g, '-');
+//         const fileName = `${safeStudentName}-${safeExamName}-certificate.pdf`;
+//         const certDir = path.join(__dirname, '../certificates');
+//         const filePath = path.join(certDir, fileName);
+  
+//         // Ensure folder exists
+//         if (!fs.existsSync(certDir)) fs.mkdirSync(certDir, { recursive: true });
+  
+//         // Generate PDF
+//         const doc = new PDFDocument();
+//         const writeStream = fs.createWriteStream(filePath);
+//         doc.pipe(writeStream);
+  
+//         doc.fontSize(26).text('Certificate of Achievement', { align: 'center' });
+//         doc.moveDown();
+//         doc.fontSize(18).text(`This is to certify that ${studentName}`, { align: 'center' });
+//         doc.text(`has successfully completed the exam: ${examName}`, { align: 'center' });
+//         doc.text(`with a score of ${percentage.toFixed(2)}%`, { align: 'center' });
+  
+//         doc.end();
+  
+//         // Wait for PDF generation
+//         await new Promise(resolve => writeStream.on('finish', resolve));
+  
+//         // Upload to S3 and remove local file
+//         certificateUrl = await uploadToS3(filePath, fileName);
+//         fs.unlinkSync(filePath);
+//       }
+  
+//       res.status(200).json({
+//         msg: "Exam submitted successfully",
+//         result,
+//         certificateUrl,
+//       });
+  
+//     } catch (error) {
+//       console.error(error);
+//       res.status(500).json({ msg: "Server error" });
+//     }
+//   });
+
+
+
+router.post('/submit/:examSessionId', auth, async (req, res) => {
+    const examSessionId = req.params.examSessionId;
+    const answers = req.body;
+  
+    if (req.user.role !== 'student') {
+      return res.status(403).json({ msg: 'Access denied' });
+    }
+  
+    if (!examSessionId) {
+      return res.status(400).json({ error: 'Missing examSessionId' });
     }
   
     try {
-      const examSession = await ExamSession.findById(req.params.examSessionId);
-      if (!examSession) return res.status(404).json({ msg: "Exam session not found" });
+      const examSession = await ExamSession.findById(examSessionId);
+      if (!examSession) return res.status(404).json({ msg: 'Exam session not found' });
   
       const exam = await Exam.findById(examSession.examId);
-      if (!exam) return res.status(404).json({ msg: "Exam not found" });
+      if (!exam) return res.status(404).json({ msg: 'Exam not found' });
   
       const currentTime = new Date();
       if (currentTime > examSession.endTime) {
-        return res.status(400).json({ msg: "Time expired. Auto-submitting exam." });
+        return res.status(400).json({ msg: 'Time expired. Auto-submitting exam.' });
       }
   
-      const { answers } = req.body;
-      if (!answers) return res.status(400).json({ msg: "Invalid answers format" });
+      if (!answers) return res.status(400).json({ msg: 'Invalid answers format' });
   
       const calculateScore = (questions, studentAnswers) => {
         let score = 0;
-        questions.forEach(question => {
-          const questionId = question._id.toString();
-          if (studentAnswers[questionId] && studentAnswers[questionId] === question.correctAnswer) {
+        questions.forEach((q) => {
+          const qid = q._id.toString();
+          if (studentAnswers[qid] && studentAnswers[qid] === q.correctAnswer) {
             score++;
           }
         });
@@ -359,24 +483,19 @@ router.post("/submit/:examSessionId", auth, async (req, res) => {
   
       let certificateUrl = null;
   
-      // 🎓 Only generate certificate if above 50%
       if (percentage > 50) {
-        const userId = new mongoose.Types.ObjectId(req.user.userId);
-        const user = await User.findById(userId);
-        const studentName = user.name || "Student";
-        const examName = exam.title || "Your Exam";
+        const user = await User.findById(req.user.userId);
+        const studentName = user.name || 'Student';
+        const examName = exam.title || 'Your Exam';
   
-        // Sanitize and build file name and path
         const safeStudentName = studentName.replace(/[\/\\?%*:|"<>]/g, '').replace(/\s+/g, '-');
         const safeExamName = examName.replace(/[\/\\?%*:|"<>]/g, '').replace(/\s+/g, '-');
         const fileName = `${safeStudentName}-${safeExamName}-certificate.pdf`;
         const certDir = path.join(__dirname, '../certificates');
         const filePath = path.join(certDir, fileName);
   
-        // Ensure folder exists
         if (!fs.existsSync(certDir)) fs.mkdirSync(certDir, { recursive: true });
   
-        // Generate PDF
         const doc = new PDFDocument();
         const writeStream = fs.createWriteStream(filePath);
         doc.pipe(writeStream);
@@ -389,24 +508,22 @@ router.post("/submit/:examSessionId", auth, async (req, res) => {
   
         doc.end();
   
-        // Wait for PDF generation
-        await new Promise(resolve => writeStream.on('finish', resolve));
+        await new Promise((resolve) => writeStream.on('finish', resolve));
   
-        // Upload to S3 and remove local file
         certificateUrl = await uploadToS3(filePath, fileName);
         fs.unlinkSync(filePath);
       }
   
       res.status(200).json({
-        msg: "Exam submitted successfully",
+        msg: 'Exam submitted successfully',
         result,
         certificateUrl,
       });
-  
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ msg: "Server error" });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ msg: 'Server error' });
     }
   });
+  
 
 module.exports = router;
